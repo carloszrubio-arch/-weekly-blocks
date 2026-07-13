@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Weekly Blocks</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: #fafaf9;
+    color: #1a1a1a;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 1200px; margin: 0 auto; padding: 24px 16px 12px; }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+    padding: 0 4px;
+  }
+  .title { font-size: 18px; font-weight: 500; letter-spacing: -0.2px; }
+  .week-range { font-size: 13px; color: #6b6b6b; }
+  .title-row { display: flex; align-items: center; gap: 14px; }
+  .nav-buttons { display: flex; gap: 4px; }
+  .nav-btn {
+    background: none;
+    border: 0.5px solid rgba(0,0,0,0.12);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #6b6b6b;
+    cursor: pointer;
+    font-family: inherit;
+    min-width: 28px;
+    line-height: 1.5;
+    transition: background 100ms, color 100ms, opacity 100ms;
+  }
+  .nav-btn:not(:disabled):hover { background: rgba(0,0,0,0.04); color: #1a1a1a; }
+  .nav-btn:not(:disabled):active { transform: scale(0.94); }
+  .nav-btn:disabled { opacity: 0.3; cursor: default; }
+
+  .day-selector {
+    display: none;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 4px 4px 14px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .day-selector::-webkit-scrollbar { display: none; }
+  .day-chip {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border: 0.5px solid;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 100ms;
+  }
+  .day-chip:active { transform: scale(0.96); }
+
+  .grid-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+  }
+  .grid-scroll::-webkit-scrollbar { height: 6px; }
+  .grid-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 40px repeat(7, minmax(100px, 1fr));
+    background: white;
+    border: 0.5px solid rgba(0,0,0,0.1);
+    border-radius: 12px;
+    min-width: 760px;
+    overflow: hidden;
+  }
+
+  .day-header {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 10px 4px;
+    letter-spacing: 0.3px;
+    border-bottom: 0.5px solid rgba(0,0,0,0.08);
+  }
+  .day-header .date {
+    font-size: 10px;
+    opacity: 0.65;
+    margin-top: 2px;
+    font-weight: 400;
+  }
+
+  .hour-col {
+    position: relative;
+    height: 640px;
+  }
+  .hour-tick {
+    position: absolute;
+    right: 6px;
+    font-size: 10px;
+    color: #a3a3a1;
+    line-height: 1;
+  }
+
+  .day-col {
+    position: relative;
+    height: 640px;
+    border-left: 0.5px solid rgba(0,0,0,0.06);
+    cursor: text;
+  }
+  .day-col::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(to bottom, transparent 0, transparent 39px, rgba(0,0,0,0.05) 39px, rgba(0,0,0,0.05) 40px, transparent 40px);
+    background-size: 100% 40px;
+    pointer-events: none;
+  }
+
+  .block {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    padding: 5px 8px 10px 22px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.35;
+    min-height: 28px;
+    cursor: pointer;
+    word-break: break-word;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+    touch-action: none;
+    transition: box-shadow 120ms, transform 120ms;
+  }
+  .block:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .block .kebab {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.35;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 0.5;
+    letter-spacing: 0;
+    color: inherit;
+    border-radius: 3px;
+    touch-action: none;
+    transition: opacity 100ms, background 100ms;
+  }
+  .block .kebab:hover { opacity: 0.85; background: rgba(0,0,0,0.06); }
+  .block.dragging {
+    z-index: 10;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    transform: scale(1.02);
+    transition: none;
+  }
+  .block.resizing {
+    z-index: 10;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    transition: none;
+  }
+  .block.editing { z-index: 5; }
+  .block-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    padding: 0;
+    margin: 0;
+    resize: none;
+    overflow: hidden;
+    min-height: 18px;
+  }
+
+  .action-menu {
+    position: fixed;
+    background: white;
+    border: 0.5px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    z-index: 200;
+    min-width: 130px;
+    padding: 4px 0;
+    animation: menuIn 100ms ease-out;
+  }
+  @keyframes menuIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .action-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #1a1a1a;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .action-menu-item:hover { background: rgba(0,0,0,0.04); }
+  .action-menu-item.destructive { color: #b93030; }
+
+  .resize-handle {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 5px;
+    cursor: ns-resize;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .resize-handle::after {
+    content: '';
+    width: 22px;
+    height: 2px;
+    background: currentColor;
+    opacity: 0.18;
+    border-radius: 1px;
+    transition: opacity 120ms, width 120ms;
+  }
+  .block:hover .resize-handle::after { opacity: 0.4; }
+  .block.resizing .resize-handle::after { opacity: 0.75; width: 30px; }
+
+  .paste-banner {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20,20,20,0.9);
+    color: white;
+    font-size: 12px;
+    padding: 8px 8px 8px 16px;
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 150;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: bannerIn 200ms ease-out;
+  }
+  @keyframes bannerIn {
+    from { opacity: 0; transform: translate(-50%, -8px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+  .paste-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    border: 0.5px solid rgba(255,255,255,0.3);
+  }
+  .paste-banner-close {
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.75;
+  }
+  .paste-banner-close:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+  body.paste-mode .day-col { cursor: copy; }
+
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 100;
+    padding: 40px 16px 16px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .overlay.open { display: flex; }
+  .overlay-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    padding: 16px 16px 20px;
+    max-height: calc(100vh - 56px);
+    display: flex;
+    flex-direction: column;
+  }
+  .overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    padding: 0 4px;
+  }
+  .overlay-title { font-size: 16px; font-weight: 500; }
+  .overlay-hint { font-size: 11px; color: #a3a3a1; }
+  .overlay-grid {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    flex: 1;
+    background: white;
+    border: 0.5px solid rgba(0,0,0,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .footer { text-align: center; margin-top: 20px; }
+  .clear-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: #a3a3a1;
+    cursor: pointer;
+    padding: 8px 16px;
+    letter-spacing: 0.3px;
+    font-family: inherit;
+  }
+  .clear-btn:hover { color: #6b6b6b; }
+
+  .status {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20,20,20,0.85);
+    color: white;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    opacity: 0;
+    transition: opacity 200ms;
+    pointer-events: none;
+    z-index: 200;
+  }
+  .status.show { opacity: 1; }
+
+  @media (max-width: 640px) {
+    .app { padding: 16px 10px 8px; }
+    .header { margin-bottom: 12px; }
+    .title { font-size: 16px; }
+    .week-range { font-size: 12px; }
+    .day-selector { display: flex; }
+    .grid { min-width: 720px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="title-row">
+      <div class="title">Weekly Blocks</div>
+      <div class="nav-buttons">
+        <button class="nav-btn" id="prevBtn" title="Semana anterior">←</button>
+        <button class="nav-btn" id="nextBtn" title="Semana siguiente">→</button>
+      </div>
+    </div>
+    <div class="week-range" id="weekRange"></div>
+  </div>
+
+  <div class="day-selector" id="daySelector"></div>
+
+  <div class="grid-scroll">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="footer">
+    <button class="clear-btn" id="clearBtn">Limpiar semana</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-content" id="overlayContent">
+    <div class="overlay-header">
+      <div class="overlay-title" id="overlayTitle"></div>
+      <div class="overlay-hint">Toca fuera para cerrar</div>
+    </div>
+    <div class="overlay-grid" id="overlayGrid"></div>
+  </div>
+</div>
+
+<div class="status" id="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// Configuración de Firebase
+// ═══════════════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyAJL2fVoHODh8pK8TFswWcxSp7uOgx-RXk",
+  authDomain: "weekly-blocks-84e15.firebaseapp.com",
+  projectId: "weekly-blocks-84e15",
+  storageBucket: "weekly-blocks-84e15.firebasestorage.app",
+  messagingSenderId: "885551715627",
+  appId: "1:885551715627:web:fd35abb01156a17d86e16e"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Paleta pastel — se cicla por orden de creación (colorCounter)
+// ═══════════════════════════════════════════════════════════════════════════
+const PALETTE = [
+  { bg: '#E6F1FB', border: '#B5D4F4', text: '#0C447C' },
+  { bg: '#E1F5EE', border: '#9FE1CB', text: '#085041' },
+  { bg: '#EAF3DE', border: '#C0DD97', text: '#27500A' },
+  { bg: '#FAEEDA', border: '#FAC775', text: '#633806' },
+  { bg: '#FAECE7', border: '#F5C4B3', text: '#712B13' },
+  { bg: '#FBEAF0', border: '#F4C0D1', text: '#72243E' },
+  { bg: '#EEEDFE', border: '#CECBF6', text: '#3C3489' }
+];
+
+const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const START_HOUR = 6;
+const END_HOUR = 22;
+const HOUR_RANGE = END_HOUR - START_HOUR;
+const GRID_HEIGHT = 640;
+const HOUR_PX = GRID_HEIGHT / HOUR_RANGE;
+const MIN_DURATION = 0.25; // 15 min
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Estado
+// ═══════════════════════════════════════════════════════════════════════════
+let blocks = [];
+let saveTimeout = null;
+let activeMonday = getMonday(new Date());
+let currentUnsub = null;
+let dragState = null;
+let resizeState = null;
+let clipboard = null;
+let colorCounter = 0;
+
+// Doble-tap para revelar acciones en móvil
+const IS_TOUCH = matchMedia('(hover: none)').matches;
+const DOUBLE_TAP_WINDOW = 300;
+const ACTIONS_TIMEOUT = 4000;
+let pendingEditTimer = null;
+let pendingEditBlockId = null;
+let lastTapId = null;
+let lastTapTime = 0;
+let actionsHideTimer = null;
+let pendingDrag = null;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Utilidades
+// ═══════════════════════════════════════════════════════════════════════════
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function formatWeekRange() {
+  const monday = activeMonday;
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  if (monday.getMonth() === sunday.getMonth()) {
+    return `Semana del ${monday.getDate()} al ${sunday.getDate()} ${months[monday.getMonth()]}`;
+  }
+  return `Semana del ${monday.getDate()} ${months[monday.getMonth()]} al ${sunday.getDate()} ${months[sunday.getMonth()]}`;
+}
+
+function getDayDates() {
+  const monday = activeMonday;
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push(d.getDate());
+  }
+  return dates;
+}
+
+function formatHour(h) {
+  if (h === 12) return '12p';
+  if (h < 12) return `${h}a`;
+  return `${h - 12}p`;
+}
+
+function getWeekKey(date) {
+  const monday = getMonday(date);
+  const y = monday.getFullYear();
+  const m = String(monday.getMonth() + 1).padStart(2, '0');
+  const d = String(monday.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function clamp(v, min, max) {
+  return Math.min(Math.max(v, min), max);
+}
+
+function el(tag, attrs) {
+  const e = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(k => e.setAttribute(k, attrs[k]));
+  return e;
+}
+
+function showStatus(text, hideAfter) {
+  const s = document.getElementById('status');
+  s.textContent = text;
+  s.classList.add('show');
+  if (hideAfter > 0) setTimeout(() => s.classList.remove('show'), hideAfter);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Firestore sync (documento por semana)
+// ═══════════════════════════════════════════════════════════════════════════
+function subscribeToWeek(weekKey) {
+  if (currentUnsub) {
+    currentUnsub();
+    currentUnsub = null;
+  }
+  const ref = db.collection('weekly-blocks').doc(weekKey);
+  currentUnsub = ref.onSnapshot(snap => {
+    const isEditing = !!document.querySelector('.block.editing');
+    if (snap.exists) {
+      const data = snap.data();
+      blocks = data.blocks || [];
+      colorCounter = data.colorCounter || 0;
+    } else {
+      blocks = [];
+      colorCounter = 0;
+    }
+    if (!isEditing) render();
+  }, err => {
+    console.error('Firestore error:', err);
+    showStatus('Error de conexión', 3000);
+  });
+}
+
+function saveBlocks() {
+  clearTimeout(saveTimeout);
+  showStatus('Guardando…');
+  // Capturar la semana y datos actuales para que un cambio de semana
+  // no altere hacia dónde va este save
+  const weekKeyForSave = getWeekKey(activeMonday);
+  const blocksSnap = blocks.slice();
+  const counterSnap = colorCounter;
+  saveTimeout = setTimeout(() => {
+    const ref = db.collection('weekly-blocks').doc(weekKeyForSave);
+    ref.set({
+      blocks: blocksSnap,
+      colorCounter: counterSnap,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => showStatus('Guardado', 1200))
+    .catch(err => {
+      console.error('Save error:', err);
+      showStatus('Error al guardar', 3000);
+    });
+  }, 400);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Navegación entre semanas (solo actual ↔ siguiente)
+// ═══════════════════════════════════════════════════════════════════════════
+function isCurrentWeek() {
+  return getWeekKey(activeMonday) === getWeekKey(new Date());
+}
+
+function isNextWeek() {
+  const next = new Date(getMonday(new Date()));
+  next.setDate(next.getDate() + 7);
+  return getWeekKey(activeMonday) === getWeekKey(next);
+}
+
+function updateNavButtons() {
+  document.getElementById('prevBtn').disabled = isCurrentWeek();
+  document.getElementById('nextBtn').disabled = isNextWeek();
+}
+
+function goToWeek(newMonday) {
+  // Cancelar cualquier interacción en curso
+  if (dragState) {
+    dragState.div.classList.remove('dragging');
+    dragState = null;
+  }
+  if (resizeState) {
+    resizeState.div.classList.remove('resizing');
+    resizeState = null;
+  }
+  pendingDrag = null;
+  if (clipboard) clearClipboard();
+
+  activeMonday = newMonday;
+  subscribeToWeek(getWeekKey(newMonday));
+
+  const overlay = document.getElementById('overlay');
+  if (overlay.classList.contains('open')) overlay.classList.remove('open');
+
+  render();
+}
+
+function nextWeek() {
+  if (isNextWeek()) return; // ya estamos en la siguiente
+  const next = new Date(activeMonday);
+  next.setDate(next.getDate() + 7);
+  goToWeek(next);
+}
+
+function prevWeek() {
+  if (isCurrentWeek()) return; // ya estamos en la actual
+  const prev = new Date(activeMonday);
+  prev.setDate(prev.getDate() - 7);
+  goToWeek(prev);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Limpieza automática: borrar semanas anteriores a la actual
+// ═══════════════════════════════════════════════════════════════════════════
+async function cleanupPastWeeks() {
+  const currentKey = getWeekKey(new Date());
+  try {
+    const snapshot = await db.collection('weekly-blocks').get();
+    const deletions = [];
+    snapshot.forEach(doc => {
+      // Solo docs con formato YYYY-MM-DD anteriores a la semana actual
+      if (/^\d{4}-\d{2}-\d{2}$/.test(doc.id) && doc.id < currentKey) {
+        deletions.push(doc.ref.delete());
+      }
+    });
+    await Promise.all(deletions);
+    if (deletions.length > 0) {
+      console.log(`Limpieza: ${deletions.length} semana(s) pasada(s) eliminada(s).`);
+    }
+  } catch (err) {
+    console.error('Error en limpieza:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Migración única: del documento viejo 'current-week' al nuevo por weekKey
+// ═══════════════════════════════════════════════════════════════════════════
+async function migrateOldFormat() {
+  const oldRef = db.collection('weekly-blocks').doc('current-week');
+  try {
+    const oldSnap = await oldRef.get();
+    if (!oldSnap.exists) return;
+    const oldData = oldSnap.data();
+    if (!oldData || !oldData.blocks || oldData.blocks.length === 0) {
+      await oldRef.delete();
+      return;
+    }
+    const currentWeekKey = getWeekKey(new Date());
+    const newRef = db.collection('weekly-blocks').doc(currentWeekKey);
+    const newSnap = await newRef.get();
+    if (!newSnap.exists) {
+      await newRef.set({
+        blocks: oldData.blocks,
+        colorCounter: oldData.colorCounter || 0,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    await oldRef.delete();
+    console.log('Migración a formato por semana completada.');
+  } catch (err) {
+    console.error('Error en migración:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Renderizado
+// ═══════════════════════════════════════════════════════════════════════════
+function render() {
+  document.getElementById('weekRange').textContent = formatWeekRange();
+  updateNavButtons();
+  renderGrid();
+  renderDaySelector();
+  const overlay = document.getElementById('overlay');
+  if (overlay.classList.contains('open')) {
+    const currentDay = parseInt(overlay.dataset.dayIndex || '0', 10);
+    populateOverlay(currentDay);
+  }
+}
+
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const dates = getDayDates();
+
+  grid.appendChild(el('div', { class: 'day-header', style: 'border-right: 0.5px solid rgba(0,0,0,0.06);' }));
+
+  DAYS.forEach((day, i) => {
+    const p = PALETTE[i];
+    const header = el('div', {
+      class: 'day-header',
+      style: `background: ${p.bg}; color: ${p.text};`
+    });
+    header.innerHTML = `${day}<div class="date">${dates[i]}</div>`;
+    grid.appendChild(header);
+  });
+
+  const hourCol = el('div', { class: 'hour-col' });
+  for (let h = START_HOUR; h < END_HOUR; h += 2) {
+    const tick = el('div', {
+      class: 'hour-tick',
+      style: `top: ${(h - START_HOUR) * HOUR_PX + 3}px;`
+    });
+    tick.textContent = formatHour(h);
+    hourCol.appendChild(tick);
+  }
+  grid.appendChild(hourCol);
+
+  for (let d = 0; d < 7; d++) {
+    grid.appendChild(buildDayColumn(d));
+  }
+}
+
+function buildDayColumn(dayIndex) {
+  const col = el('div', { class: 'day-col', 'data-day': String(dayIndex) });
+  col.addEventListener('click', (e) => {
+    if (e.target !== col) return;
+    const rect = col.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const startHour = clamp(START_HOUR + (y / GRID_HEIGHT) * HOUR_RANGE, START_HOUR, END_HOUR - MIN_DURATION);
+    if (clipboard) {
+      pasteBlock(dayIndex, startHour);
+    } else {
+      createBlock(dayIndex, startHour);
+    }
+  });
+  blocks.filter(b => b.day === dayIndex).forEach(block => {
+    col.appendChild(renderBlock(block));
+  });
+  return col;
+}
+
+function renderBlock(block) {
+  const p = PALETTE[block.colorIndex % PALETTE.length];
+  const top = (block.startHour - START_HOUR) * HOUR_PX;
+  let style = `top: ${top}px; background: ${p.bg}; border: 0.5px solid ${p.border}; color: ${p.text};`;
+  if (block.durationHours) {
+    style += ` height: ${block.durationHours * HOUR_PX}px;`;
+  }
+  const div = el('div', {
+    class: 'block',
+    style,
+    'data-id': block.id
+  });
+
+  const text = el('div', { class: 'block-text' });
+  text.textContent = block.text || '(sin texto)';
+  div.appendChild(text);
+
+  // Menú kebab (Copiar / Eliminar)
+  const kebab = el('div', { class: 'kebab', title: 'Opciones' });
+  kebab.textContent = '⋮';
+  kebab.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    showActionMenu(kebab, block);
+  });
+  kebab.addEventListener('mousedown', (e) => e.stopPropagation());
+  kebab.addEventListener('touchstart', (e) => e.stopPropagation());
+  div.appendChild(kebab);
+
+  // Handle de resize
+  const handle = el('div', { class: 'resize-handle' });
+  handle.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    startResize(div, block, e.clientY);
+  });
+  handle.addEventListener('touchstart', (e) => {
+    e.stopPropagation();
+    startResize(div, block, e.touches[0].clientY);
+  }, { passive: true });
+  div.appendChild(handle);
+
+  attachBlockHandlers(div, block);
+  return div;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Interacción: tap edita, long-press mueve
+// ═══════════════════════════════════════════════════════════════════════════
+function attachBlockHandlers(div, block) {
+  let longPressTimer = null;
+  let initialY = 0;
+  let moved = false;
+
+  const startDrag = () => {
+    dragState = {
+      div,
+      block,
+      startTop: (block.startHour - START_HOUR) * HOUR_PX,
+      initialY
+    };
+    div.classList.add('dragging');
+    if (navigator.vibrate) navigator.vibrate(25);
+  };
+
+  const onDown = (e) => {
+    if (e.target.closest('.kebab') || e.target.closest('.resize-handle')) return;
+    if (div.classList.contains('editing')) return;
+    moved = false;
+    initialY = e.touches ? e.touches[0].clientY : e.clientY;
+    clearTimeout(longPressTimer);
+    if (IS_TOUCH) {
+      // Touch: long-press 500ms activa el drag (evita conflicto con scroll)
+      longPressTimer = setTimeout(() => {
+        if (!moved && !div.classList.contains('editing')) startDrag();
+      }, 500);
+    } else {
+      // Desktop: drag pre-armado; se activa al mover el mouse >6px (globalMove)
+      pendingDrag = { start: startDrag, initialY };
+    }
+  };
+
+  const onLocalMove = (e) => {
+    if (moved) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    if (Math.abs(y - initialY) > 10) {
+      moved = true;
+      clearTimeout(longPressTimer);
+    }
+  };
+
+  const onUp = (e) => {
+    clearTimeout(longPressTimer);
+    if (dragState && dragState.div === div) return;
+    if (moved) return;
+    if (div.classList.contains('editing')) return;
+    // Editar inmediato — necesario para que el teclado móvil abra (foco dentro del gesto)
+    editBlock(div, block);
+  };
+
+  div.addEventListener('mousedown', onDown);
+  div.addEventListener('touchstart', onDown, { passive: true });
+  div.addEventListener('mousemove', onLocalMove);
+  div.addEventListener('touchmove', onLocalMove, { passive: true });
+  div.addEventListener('mouseup', onUp);
+  div.addEventListener('touchend', onUp);
+}
+
+// Handlers globales para drag (mover) y resize
+function globalMove(e) {
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+
+  // Desktop: activar drag pendiente al mover >6px
+  if (pendingDrag && !dragState && !resizeState) {
+    if (Math.abs(y - pendingDrag.initialY) > 6) {
+      pendingDrag.start();
+      pendingDrag = null;
+    }
+  }
+
+  if (dragState) {
+    e.preventDefault();
+    const delta = y - dragState.initialY;
+    const newTop = clamp(dragState.startTop + delta, 0, GRID_HEIGHT - 28);
+    dragState.div.style.top = `${newTop}px`;
+  } else if (resizeState) {
+    e.preventDefault();
+    const delta = y - resizeState.initialY;
+    const newHeight = clamp(resizeState.initialHeight + delta, HOUR_PX * MIN_DURATION, GRID_HEIGHT);
+    resizeState.div.style.height = `${newHeight}px`;
+  }
+}
+function globalUp() {
+  if (pendingDrag) pendingDrag = null;
+  if (dragState) {
+    const { div, block } = dragState;
+    div.classList.remove('dragging');
+    const newTop = parseFloat(div.style.top);
+    const newStartHour = clamp(START_HOUR + newTop / HOUR_PX, START_HOUR, END_HOUR - MIN_DURATION);
+    block.startHour = Math.round(newStartHour * 4) / 4;
+    dragState = null;
+    saveBlocks();
+  } else if (resizeState) {
+    const { div, block } = resizeState;
+    div.classList.remove('resizing');
+    const finalHeight = parseFloat(div.style.height);
+    const dur = Math.max(MIN_DURATION, Math.round(finalHeight / HOUR_PX * 4) / 4);
+    block.durationHours = dur;
+    div.style.height = `${dur * HOUR_PX}px`;
+    resizeState = null;
+    saveBlocks();
+  }
+}
+window.addEventListener('mousemove', globalMove);
+window.addEventListener('touchmove', globalMove, { passive: false });
+window.addEventListener('mouseup', globalUp);
+window.addEventListener('touchend', globalUp);
+
+function startResize(div, block, y) {
+  const initialHeight = block.durationHours
+    ? block.durationHours * HOUR_PX
+    : div.offsetHeight;
+  resizeState = { div, block, initialHeight, initialY: y };
+  div.classList.add('resizing');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Menú de acciones (⋮) — popover flotante con Copiar / Eliminar
+// ═══════════════════════════════════════════════════════════════════════════
+function showActionMenu(anchorEl, block) {
+  hideAllActionMenus();
+  const rect = anchorEl.getBoundingClientRect();
+  const menu = el('div', { class: 'action-menu' });
+
+  const copyItem = el('div', { class: 'action-menu-item' });
+  copyItem.textContent = 'Copiar';
+  copyItem.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideAllActionMenus();
+    copyBlockToClipboard(block);
+  });
+
+  const deleteItem = el('div', { class: 'action-menu-item destructive' });
+  deleteItem.textContent = 'Eliminar';
+  deleteItem.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideAllActionMenus();
+    deleteBlock(block.id);
+  });
+
+  menu.appendChild(copyItem);
+  menu.appendChild(deleteItem);
+  document.body.appendChild(menu);
+
+  // Posicionar: por defecto debajo del kebab. Si no cabe abajo → arriba.
+  const menuRect = menu.getBoundingClientRect();
+  let left = rect.left;
+  let top = rect.bottom + 4;
+  if (top + menuRect.height > window.innerHeight - 8) {
+    top = rect.top - menuRect.height - 4;
+  }
+  if (left + menuRect.width > window.innerWidth - 8) {
+    left = window.innerWidth - menuRect.width - 8;
+  }
+  if (left < 8) left = 8;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
+
+function hideAllActionMenus() {
+  document.querySelectorAll('.action-menu').forEach(m => m.remove());
+}
+
+// Cerrar menú al tap fuera
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.action-menu') && !e.target.closest('.kebab')) {
+    hideAllActionMenus();
+  }
+});
+// Cerrar menú al hacer scroll (evita que quede colgando fuera de posición)
+window.addEventListener('scroll', hideAllActionMenus, true);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Editar bloque
+// ═══════════════════════════════════════════════════════════════════════════
+function editBlock(div, block) {
+  if (div.classList.contains('editing')) return;
+  div.classList.add('editing');
+
+  // Si tiene altura fija, la liberamos temporalmente
+  const savedHeight = div.style.height;
+  if (block.durationHours) div.style.height = 'auto';
+
+  const textEl = div.querySelector('.block-text');
+  const textarea = document.createElement('textarea');
+  textarea.className = 'block-input';
+  textarea.value = block.text || '';
+  textarea.rows = 1;
+  textEl.replaceWith(textarea);
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+  const resize = () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  };
+  resize();
+  textarea.addEventListener('input', resize);
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    const val = textarea.value.trim();
+    div.classList.remove('editing');
+    if (!val) {
+      blocks = blocks.filter(b => b.id !== block.id);
+    } else {
+      block.text = val;
+    }
+    saveBlocks();
+    render();
+  };
+
+  textarea.addEventListener('blur', finish);
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      textarea.blur();
+    } else if (e.key === 'Escape') {
+      textarea.value = block.text || '';
+      textarea.blur();
+    }
+  });
+}
+
+function createBlock(day, startHour) {
+  startHour = Math.round(startHour * 4) / 4;
+  const newBlock = {
+    id: 'b' + Date.now() + Math.random().toString(36).slice(2, 6),
+    day,
+    startHour,
+    text: '',
+    colorIndex: colorCounter % PALETTE.length
+  };
+  colorCounter++;
+  blocks.push(newBlock);
+  render();
+  setTimeout(() => {
+    const div = document.querySelector(`[data-id="${newBlock.id}"]`);
+    if (div) editBlock(div, newBlock);
+  }, 0);
+}
+
+function deleteBlock(id) {
+  if (!confirm('¿Eliminar este bloque?')) return;
+  blocks = blocks.filter(b => b.id !== id);
+  saveBlocks();
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Copiar / pegar tareas
+// ═══════════════════════════════════════════════════════════════════════════
+function copyBlockToClipboard(block) {
+  clipboard = {
+    text: block.text,
+    colorIndex: block.colorIndex
+  };
+  if (block.durationHours) clipboard.durationHours = block.durationHours;
+  showPasteBanner();
+}
+
+function showPasteBanner() {
+  const existing = document.getElementById('pasteBanner');
+  if (existing) existing.remove();
+  const p = PALETTE[clipboard.colorIndex % PALETTE.length];
+  const banner = el('div', { class: 'paste-banner', id: 'pasteBanner' });
+  const swatch = el('div', { class: 'paste-swatch', style: `background: ${p.bg}; border-color: ${p.border};` });
+  const label = el('span');
+  const shortText = (clipboard.text || '').length > 22
+    ? clipboard.text.slice(0, 22) + '…'
+    : clipboard.text;
+  label.textContent = `«${shortText}» — toca un día para pegar`;
+  const closeBtn = el('div', { class: 'paste-banner-close', title: 'Cancelar' });
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', clearClipboard);
+  banner.appendChild(swatch);
+  banner.appendChild(label);
+  banner.appendChild(closeBtn);
+  document.body.appendChild(banner);
+  document.body.classList.add('paste-mode');
+}
+
+function clearClipboard() {
+  clipboard = null;
+  const banner = document.getElementById('pasteBanner');
+  if (banner) banner.remove();
+  document.body.classList.remove('paste-mode');
+}
+
+function pasteBlock(day, startHour) {
+  if (!clipboard) return;
+  const rounded = Math.round(startHour * 4) / 4;
+  const newBlock = {
+    id: 'b' + Date.now() + Math.random().toString(36).slice(2, 6),
+    day,
+    startHour: rounded,
+    text: clipboard.text,
+    colorIndex: clipboard.colorIndex // mismo color que el original
+  };
+  if (clipboard.durationHours) newBlock.durationHours = clipboard.durationHours;
+  blocks.push(newBlock);
+  saveBlocks();
+  render();
+  showStatus('Pegado ✓', 900);
+  // El clipboard sigue activo para pegar más veces
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && clipboard) clearClipboard();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Selector de día (móvil) + overlay
+// ═══════════════════════════════════════════════════════════════════════════
+function renderDaySelector() {
+  const selector = document.getElementById('daySelector');
+  selector.innerHTML = '';
+  const dates = getDayDates();
+  DAYS.forEach((day, i) => {
+    const p = PALETTE[i];
+    const chip = el('div', {
+      class: 'day-chip',
+      style: `color: ${p.text}; background: ${p.bg}; border-color: ${p.border};`
+    });
+    chip.textContent = `${day} ${dates[i]}`;
+    chip.addEventListener('click', () => openDayOverlay(i));
+    selector.appendChild(chip);
+  });
+}
+
+function openDayOverlay(dayIndex) {
+  const overlay = document.getElementById('overlay');
+  overlay.dataset.dayIndex = String(dayIndex);
+  populateOverlay(dayIndex);
+  overlay.classList.add('open');
+}
+
+function populateOverlay(dayIndex) {
+  const grid = document.getElementById('overlayGrid');
+  const title = document.getElementById('overlayTitle');
+  const p = PALETTE[dayIndex];
+  const dates = getDayDates();
+  title.textContent = `${DAYS[dayIndex]} ${dates[dayIndex]}`;
+  title.style.color = p.text;
+
+  grid.innerHTML = '';
+
+  const hourCol = el('div', { class: 'hour-col' });
+  for (let h = START_HOUR; h < END_HOUR; h += 2) {
+    const tick = el('div', {
+      class: 'hour-tick',
+      style: `top: ${(h - START_HOUR) * HOUR_PX + 3}px;`
+    });
+    tick.textContent = formatHour(h);
+    hourCol.appendChild(tick);
+  }
+  grid.appendChild(hourCol);
+
+  grid.appendChild(buildDayColumn(dayIndex));
+}
+
+document.getElementById('overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'overlay') {
+    e.currentTarget.classList.remove('open');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Limpiar semana
+// ═══════════════════════════════════════════════════════════════════════════
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!blocks.length) {
+    showStatus('La semana ya está vacía', 1500);
+    return;
+  }
+  if (!confirm('¿Borrar todos los bloques de la semana?')) return;
+  blocks = [];
+  colorCounter = 0;
+  saveBlocks();
+  render();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Init: cablear botones, migrar formato viejo, limpiar semanas pasadas, subscribirse
+// ═══════════════════════════════════════════════════════════════════════════
+document.getElementById('prevBtn').addEventListener('click', prevWeek);
+document.getElementById('nextBtn').addEventListener('click', nextWeek);
+
+(async function init() {
+  render();
+  await migrateOldFormat();
+  await cleanupPastWeeks();
+  subscribeToWeek(getWeekKey(activeMonday));
+})();
+</script>
+
+</body>
+</html>
